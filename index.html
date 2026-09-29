@@ -250,15 +250,6 @@
     }
     .ref-stack { display: grid; gap: .5rem; padding: .5rem; background: #f8fafc; flex: 1; align-content: center; }
     .ref-stack img { width: 100%; border-radius: .5rem; object-fit: contain; max-height: 220px; cursor: zoom-in; background: #fff; }
-    .score-row { display: flex; gap: .35rem; padding: .55rem .75rem; border-top: 1px solid var(--line); flex-wrap: wrap; }
-    .score {
-      font-size: .74rem;
-      border-radius: 999px;
-      padding: .15rem .55rem;
-      background: #f1f5f9;
-      color: #334155;
-    }
-    .panel.ours .score { background: color-mix(in srgb, var(--p1) 14%, #fff); color: var(--p2); }
     .nav-btn {
       border: 1px solid var(--line);
       border-radius: 999px;
@@ -569,7 +560,7 @@
           <div class="flex items-end justify-between gap-4 flex-wrap">
             <div>
               <h3 class="subsection-heading text-2xl font-bold">Multi-Reference Generation &middot; OmniContext</h3>
-              <p class="text-sm text-slate-500 mt-1">Qwen-Image-Edit-2511 with two or three reference images. Scores are per-sample VIEScore with GPT-4.1 as judge (PF / SC / Overall).</p>
+              <p class="text-sm text-slate-500 mt-1">Qwen-Image-Edit-2511 with two or three reference images.</p>
             </div>
             <div class="flex gap-2">
               <button class="nav-btn" data-step="-1" aria-label="Previous case">&#8592;</button>
@@ -942,12 +933,7 @@
           <div class="panel-head"><span>References</span><span class="text-xs text-slate-400 font-normal">${c.inputs.length} images</span></div>
           <div class="ref-stack">${c.inputs.map((src, i) => `<img src="${src}" alt="Reference ${i + 1}" data-zoom="${src}" data-title="Reference ${i + 1}" loading="lazy">`).join("")}</div>
         </div>`;
-      const outs = ["full", "isolated", "anchor"].map((key) => {
-        const o = c.outputs[key];
-        const scores = `<div class="score-row"><span class="score">PF ${o.pf}</span><span class="score">SC ${o.sc}</span><span class="score">Overall ${o.overall}</span></div>`;
-        return outputPanel(key, o.src, scores);
-      }).join("");
-      return refs + outs;
+      return refs + ["full", "isolated", "anchor"].map((key) => outputPanel(key, c.outputs[key].src)).join("");
     }
 
     function renderGedit(c) {
@@ -983,7 +969,7 @@
           const c = DATA.openve[Number(card.dataset.i)];
           const vid = (src, poster, label, ours) => `
             <figure class="relative m-0">
-              <video src="${src}" poster="${poster}" muted loop playsinline autoplay disablepictureinpicture class="w-full aspect-video bg-black rounded-lg object-contain"></video>
+              <video src="${src}" poster="${poster}" muted loop playsinline autoplay controls disablepictureinpicture class="w-full aspect-video bg-black rounded-lg object-contain"></video>
               <span class="video-tag${ours ? " ours" : ""}">${label}</span>
             </figure>`;
           openModal({
@@ -1006,19 +992,27 @@
         video.dataset.loaded = "true";
         video.load();
       };
+      const play = (video) => {
+        video.muted = true;
+        video.play().catch(() => {});
+      };
       const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           const video = entry.target;
+          video.dataset.visible = entry.isIntersecting ? "true" : "false";
           if (entry.isIntersecting) {
             load(video);
-            video.muted = true;
-            video.play().catch(() => {});
+            play(video);
           } else {
             video.pause();
           }
         });
       }, { rootMargin: "200px 0px", threshold: 0.35 });
-      videos.forEach((v) => observer.observe(v));
+      videos.forEach((v) => {
+        // play() can be rejected while the source is still loading; retry once data is ready.
+        v.addEventListener("canplay", () => { if (v.dataset.visible === "true" && v.paused) play(v); });
+        observer.observe(v);
+      });
     }
 
     document.getElementById("copy-bib").addEventListener("click", async (e) => {
